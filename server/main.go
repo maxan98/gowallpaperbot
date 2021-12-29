@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
@@ -173,33 +172,24 @@ func sendReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI) {
 
 func main() {
 
+	fmt.Println("Loading config..")
+	configPath, err := settings.ParseFlags()
+	if err != nil {
+		panic("no configpath " + err.Error())
+	}
+	set, err := settings.NewConfig(configPath)
+	if err != nil {
+		panic("Unable to parse config " + err.Error())
+	}
+
 	//delete
-	lfile, err := os.Create("./log.log")
+	lfile, err := os.Create(set.LogFile)
 	if err != nil {
 		panic(err.Error())
 	}
 	mw := io.MultiWriter(os.Stdout, lfile)
 	log.SetOutput(mw)
-	if err := godotenv.Load(); err != nil {
-		log.Info("No .env file found")
-	}
-	log.Info("Trying to get Token from env TOKEN..")
-	var token string
-	var filePath string
-	var ok bool
-	if token, ok = os.LookupEnv("TOKEN"); !ok {
-		log.Panic("Bot token unset", token)
-	}
-	log.Info(token)
-	if filePath, ok = os.LookupEnv("FILES_DIR"); !ok {
-		log.Panic("File Path unset", token)
-	} else {
-		filePath = "./files/"
-	}
-	log.Info(token)
-	set := settings.GetInstance()
-	set.SetToken(token)
-	set.SetFilePath(filePath)
+
 	bot, err := tgbotapi.NewBotAPI(set.GetSettings().GetToken())
 	if err != nil {
 		log.Panic(err)
@@ -218,12 +208,16 @@ func main() {
 	go sendReminder(tick, bot)
 	for update := range updates {
 		if update.Message != nil { // If we got a message
-			chatList := chats.GetInstance()
-			chatList.AppendClient(update.Message.Chat.ID)
+			for _, i := range set.AllowedIDs {
+				if update.Message.From.ID == i {
+					chatList := chats.GetInstance()
+					chatList.AppendClient(update.Message.Chat.ID)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-			go processRequest(update, ctx, bot)
+					ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+					defer cancel()
+					go processRequest(update, ctx, bot)
+				}
+			}
 		}
 	}
 }
