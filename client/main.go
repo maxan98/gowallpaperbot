@@ -37,7 +37,7 @@ func checkForUpdates(url string, cb chan bool, ticker *time.Ticker) {
 
 func main() {
 	//10.10.0.209
-	url := "127.0.0.1:10000"
+	url := "10.10.0.209:10000"
 	cb := make(chan bool)
 	t := time.NewTicker(30 * time.Minute)
 	go callback.CheckNastyCallback(cb)

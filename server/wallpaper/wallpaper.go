@@ -50,5 +50,5 @@ func (p *picture) GetPicture() (image.Image, string, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	fmt.Println(p.format, p.filePath, "hey")
-	return instance.data, instance.format, nil
+	return instance.data, instance.filePath, nil
 }

@@ -19,14 +19,14 @@ import (
 )
 
 func downloadFile(filepath string, url string, res chan bool) {
-	settings := settings.GetInstance()
+	set := settings.GetInstance()
 	// Create the file
-	err := os.MkdirAll(settings.GetSettings().GetFilePath(), 0775)
+	err := os.MkdirAll(set.GetSettings().GetFilePath(), 0775)
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
-	fmt.Println("saving to", settings.GetSettings().GetFilePath(), filepath)
-	out, err := os.Create(settings.GetSettings().GetFilePath() + filepath)
+	fmt.Println("saving to", set.GetSettings().GetFilePath(), filepath)
+	out, err := os.Create(set.GetSettings().GetFilePath() + filepath)
 	if err != nil {
 		res <- false
 		return
@@ -53,19 +53,42 @@ func downloadFile(filepath string, url string, res chan bool) {
 		res <- false
 		return
 	}
+
 	res <- true
 
 }
-
+func cleanupFiles(){
+	set:=settings.GetInstance()
+	img := wallpaper.GetPicture()
+	_,imgpath,_ := img.GetPicture()
+	files, err := os.ReadDir(set.GetSettings().GetFilePath())
+	if err != nil {
+		fmt.Println("Error while cleanin up files")
+	}
+	for _, i := range files{
+		if !i.IsDir() && set.GetSettings().GetFilePath() + i.Name() != imgpath{
+			fmt.Println("ianme", set.GetSettings().GetFilePath() + i.Name(),"filepath", imgpath)
+			err = os.Remove(set.GetSettings().GetFilePath() + i.Name())
+			if err != nil {
+				fmt.Println("Error while deleting old image", err.Error())
+			}
+		}
+	}
+}
 func processRequest(update tgbotapi.Update, ctx context.Context, log *zap.SugaredLogger, token string, bot *tgbotapi.BotAPI) {
 	var msg tgbotapi.MessageConfig
 	settings := settings.GetInstance()
 	log.Infof("[%s] %s", update.Message.From.UserName, update.Message.Text)
-	if update.Message.Photo != nil {
-		pic := update.Message.Photo[len(update.Message.Photo)-1]
-		log.Info(pic.FileID)
-		file := &tgbotapi.File{FileID: pic.FileID}
+	if update.Message.Photo != nil || update.Message.Document  != nil {
+		var  file *tgbotapi.File
+		if len(update.Message.Photo) != 0 {
+			pic := update.Message.Photo[len(update.Message.Photo)-1]
 
+			log.Info(pic.FileID)
+			file = &tgbotapi.File{FileID: pic.FileID}
+		}else if update.Message.Document != nil{
+			file = &tgbotapi.File{FileID: update.Message.Document.FileID}
+		}
 		directURL, err := bot.GetFileDirectURL(file.FileID)
 		if err != nil {
 			log.Info("Unable to get file path from telegram server")
@@ -89,7 +112,7 @@ func processRequest(update tgbotapi.Update, ctx context.Context, log *zap.Sugare
 						}
 
 						cl := clients.GetInstance()
-
+						cleanupFiles()
 						for _, i := range cl.GetClients() {
 							log.Info("Trying to ping the clients callback URL at ", i)
 							cburl := fmt.Sprintf("http://%s:10001", i)
@@ -140,7 +163,7 @@ func main() {
 	if filePath, ok = os.LookupEnv("FILES_DIR"); !ok {
 		log.Panic("File Path unset", token)
 	} else {
-		filePath = "./files"
+		filePath = "./files/"
 	}
 	log.Info(token)
 	set := settings.GetInstance()
