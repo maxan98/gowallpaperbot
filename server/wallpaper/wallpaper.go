@@ -2,7 +2,7 @@ package wallpaper
 
 import (
 	"errors"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"image"
 	"os"
 	"sync"
@@ -30,7 +30,7 @@ func (p *picture) SetPicture(filepath string) error {
 	defer p.lock.Unlock()
 	f, err := os.Open(filepath)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Info(err.Error())
 		return errors.New("Unable to get wallpaper")
 	}
 	defer f.Close()
@@ -49,6 +49,6 @@ func (p *picture) SetPicture(filepath string) error {
 func (p *picture) GetPicture() (image.Image, string, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	fmt.Println(p.format, p.filePath, "hey")
+	log.Info(p.format, p.filePath, "hey")
 	return instance.data, instance.filePath, nil
 }

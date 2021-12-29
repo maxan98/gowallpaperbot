@@ -9,9 +9,8 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
+	log "github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,7 +24,7 @@ func downloadFile(filepath string, url string, res chan bool) {
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
-	fmt.Println("saving to", set.GetSettings().GetFilePath(), filepath)
+	log.Info("saving to", set.GetSettings().GetFilePath(), filepath)
 	out, err := os.Create(set.GetSettings().GetFilePath() + filepath)
 	if err != nil {
 		res <- false
@@ -63,19 +62,19 @@ func cleanupFiles(){
 	_,imgpath,_ := img.GetPicture()
 	files, err := os.ReadDir(set.GetSettings().GetFilePath())
 	if err != nil {
-		fmt.Println("Error while cleanin up files")
+		log.Info("Error while cleanin up files")
 	}
 	for _, i := range files{
 		if !i.IsDir() && set.GetSettings().GetFilePath() + i.Name() != imgpath{
-			fmt.Println("ianme", set.GetSettings().GetFilePath() + i.Name(),"filepath", imgpath)
+			log.Info("iname", set.GetSettings().GetFilePath() + i.Name(),"filepath", imgpath)
 			err = os.Remove(set.GetSettings().GetFilePath() + i.Name())
 			if err != nil {
-				fmt.Println("Error while deleting old image", err.Error())
+				log.Info("Error while deleting old image", err.Error())
 			}
 		}
 	}
 }
-func processRequest(update tgbotapi.Update, ctx context.Context, log *zap.SugaredLogger, token string, bot *tgbotapi.BotAPI) {
+func processRequest(update tgbotapi.Update, ctx context.Context,  bot *tgbotapi.BotAPI) {
 	var msg tgbotapi.MessageConfig
 	settings := settings.GetInstance()
 	log.Infof("[%s] %s", update.Message.From.UserName, update.Message.Text)
@@ -137,7 +136,7 @@ func processRequest(update tgbotapi.Update, ctx context.Context, log *zap.Sugare
 	}
 
 	msg.ReplyToMessageID = update.Message.MessageID
-
+	log.Infof("Finishing processing request from %s, sending resp %s", update.Message.From.FirstName, msg.Text)
 	_, err := bot.Send(msg)
 	if err != nil {
 		log.Info("error in sending response")
@@ -146,9 +145,12 @@ func processRequest(update tgbotapi.Update, ctx context.Context, log *zap.Sugare
 
 func main() {
 	//delete
-	logger, _ := zap.NewProduction()
-	defer logger.Sync() // flushes buffer, if any
-	log := logger.Sugar()
+	lfile, err := os.Create("./log.log")
+	if err != nil {
+		panic(err.Error())
+	}
+	mw := io.MultiWriter(os.Stdout, lfile)
+	log.SetOutput(mw)
 	if err := godotenv.Load(); err != nil {
 		log.Info("No .env file found")
 	}
@@ -175,9 +177,8 @@ func main() {
 	}
 
 	bot.Debug = true
-
 	log.Infof("Authorized on account %s", bot.Self.UserName)
-
+	tgbotapi.SetLogger(log.StandardLogger())
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -189,7 +190,7 @@ func main() {
 		if update.Message != nil { // If we got a message
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			go processRequest(update, ctx, log, token, bot)
+			go processRequest(update, ctx, bot)
 		}
 	}
 }

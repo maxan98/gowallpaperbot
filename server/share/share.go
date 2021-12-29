@@ -6,7 +6,7 @@ import (
 	"client/wallpaper"
 	"fmt"
 	"image/jpeg"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,9 +32,9 @@ func getWallpaper(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(buffer.Bytes())))
 		var res int
 		if res, err = w.Write(buffer.Bytes()); err != nil {
-			log.Println("unable to write image.")
+			log.Info("unable to write image.")
 		}
-		fmt.Println("Wrote bytes: ", res)
+		log.Info("Wrote bytes: ", res)
 	} else {
 		w.WriteHeader(500)
 		w.Write([]byte("Error writing image"))
