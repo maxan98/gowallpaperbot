@@ -24,5 +24,10 @@ func (s *clients) GetClients() []string {
 func (s *clients) AppendClient(ip string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	for _, i := range s.ips {
+		if i == ip {
+			return
+		}
+	}
 	s.ips = append(s.ips, ip)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"client/chats"
 	clients "client/clients"
 	"client/settings"
 	"client/share"
@@ -11,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,17 +58,17 @@ func downloadFile(filepath string, url string, res chan bool) {
 	res <- true
 
 }
-func cleanupFiles(){
-	set:=settings.GetInstance()
+func cleanupFiles() {
+	set := settings.GetInstance()
 	img := wallpaper.GetPicture()
-	_,imgpath,_ := img.GetPicture()
+	_, imgpath, _ := img.GetPicture()
 	files, err := os.ReadDir(set.GetSettings().GetFilePath())
 	if err != nil {
 		log.Info("Error while cleanin up files")
 	}
-	for _, i := range files{
-		if !i.IsDir() && set.GetSettings().GetFilePath() + i.Name() != imgpath{
-			log.Info("iname", set.GetSettings().GetFilePath() + i.Name(),"filepath", imgpath)
+	for _, i := range files {
+		if !i.IsDir() && set.GetSettings().GetFilePath()+i.Name() != imgpath {
+			log.Info("iname", set.GetSettings().GetFilePath()+i.Name(), "filepath", imgpath)
 			err = os.Remove(set.GetSettings().GetFilePath() + i.Name())
 			if err != nil {
 				log.Info("Error while deleting old image", err.Error())
@@ -74,18 +76,18 @@ func cleanupFiles(){
 		}
 	}
 }
-func processRequest(update tgbotapi.Update, ctx context.Context,  bot *tgbotapi.BotAPI) {
+func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.BotAPI) {
 	var msg tgbotapi.MessageConfig
 	settings := settings.GetInstance()
 	log.Infof("[%s] %s", update.Message.From.UserName, update.Message.Text)
-	if update.Message.Photo != nil || update.Message.Document  != nil {
-		var  file *tgbotapi.File
+	if update.Message.Photo != nil || update.Message.Document != nil {
+		var file *tgbotapi.File
 		if len(update.Message.Photo) != 0 {
 			pic := update.Message.Photo[len(update.Message.Photo)-1]
 
 			log.Info(pic.FileID)
 			file = &tgbotapi.File{FileID: pic.FileID}
-		}else if update.Message.Document != nil{
+		} else if update.Message.Document != nil {
 			file = &tgbotapi.File{FileID: update.Message.Document.FileID}
 		}
 		directURL, err := bot.GetFileDirectURL(file.FileID)
@@ -143,7 +145,34 @@ func processRequest(update tgbotapi.Update, ctx context.Context,  bot *tgbotapi.
 	}
 }
 
+func sendReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI) {
+	log.Info("Starting reminder goroutine")
+	s3 := rand.NewSource(time.Now().UnixNano())
+	r3 := rand.New(s3)
+	for {
+		select {
+		case <-ticker.C:
+			newRandom := r3.Intn(10)
+			if newRandom >= 4 {
+				chatList := chats.GetInstance()
+				log.Info("random decided to update ", newRandom)
+				log.Info(chatList)
+				ch := chatList.GetClients()
+				for _, i := range ch {
+					msg := tgbotapi.NewMessage(i, "Hey! It is been a while since you last updated the wallpaper. Please find some time to do so :)")
+					_, err := bot.Send(msg)
+					if err != nil {
+						log.Info("error in sending response")
+					}
+				}
+
+			}
+		}
+	}
+}
+
 func main() {
+
 	//delete
 	lfile, err := os.Create("./log.log")
 	if err != nil {
@@ -185,9 +214,13 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	go share.HandleRequests()
-
+	tick := time.NewTicker(113 * time.Minute)
+	go sendReminder(tick, bot)
 	for update := range updates {
 		if update.Message != nil { // If we got a message
+			chatList := chats.GetInstance()
+			chatList.AppendClient(update.Message.Chat.ID)
+
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			go processRequest(update, ctx, bot)
