@@ -206,7 +206,7 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	go share.HandleRequests()
-	tick := time.NewTicker(113 * time.Minute)
+	tick := time.NewTicker(213 * time.Minute)
 	go sendReminder(tick, bot)
 	for update := range updates {
 		if update.Message != nil { // If we got a message
