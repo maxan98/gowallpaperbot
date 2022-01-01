@@ -9,5 +9,3 @@ allowedIDs:
 logFile: "/tmp/wpprlog.log"
 certFilePath: "/path/"
 certKeyPath: "/path"
-Username: "username"
-Password: "Password"
