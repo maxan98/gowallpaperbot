@@ -2,6 +2,7 @@ package main
 
 import (
 	"client/callback"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/reujab/wallpaper"
@@ -40,8 +41,13 @@ func downloadImage(url string) (string, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 20,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", "https://"+url, nil)
 	if err != nil {
 		return "", fmt.Errorf("Got error %s", err.Error())
 	}
