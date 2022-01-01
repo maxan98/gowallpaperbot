@@ -7,3 +7,7 @@ allowedIDs:
   - 247671430
   - 418367041
 logFile: "/tmp/wpprlog.log"
+certFilePath: "/path/"
+certKeyPath: "/path"
+Username: "username"
+Password: "Password"
