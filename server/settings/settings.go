@@ -10,11 +10,15 @@ import (
 )
 
 type settings struct {
-	Token      string  `yaml:"token"`
-	Filepath   string  `yaml:"fileDir"`
-	AllowedIDs []int64 `yaml:"allowedIDs"`
-	LogFile    string  `yaml:"logFile"`
-	lock       sync.RWMutex
+	Token        string  `yaml:"token"`
+	Filepath     string  `yaml:"fileDir"`
+	AllowedIDs   []int64 `yaml:"allowedIDs"`
+	LogFile      string  `yaml:"logFile"`
+	CertFilePath string  `yaml:"certFilePath"`
+	CertKeyPath  string  `yaml:"certKeyPath"`
+	Username     string  `yaml:"Username,omitempty"`
+	Password     string  `yaml:"Password,omitempty"`
+	lock         sync.RWMutex
 }
 
 var instance *settings
@@ -32,7 +36,7 @@ func ValidateConfigPath(path string) error {
 }
 
 func (s *settings) ValidateConfig() bool {
-	if s.LogFile == "" || s.AllowedIDs == nil || s.Filepath == "" || s.Token == "" {
+	if s.LogFile == "" || s.AllowedIDs == nil || s.Filepath == "" || s.Token == "" || s.CertFilePath == "" || s.CertKeyPath == "" || s.Username == "" || s.Password == "" {
 		return false
 	}
 	return true
@@ -63,6 +67,10 @@ func NewConfig(configPath string) (*settings, error) {
 	if err := d.Decode(&set); err != nil {
 		return nil, err
 	}
+	u := os.Getenv("X_WPPR_USERNAME")
+	set.Username = u
+	p := os.Getenv("X_WPPR_PASSWORD")
+	set.Password = p
 	ok := set.ValidateConfig()
 	if !ok {
 		return nil, errors.New("invalid Config")
@@ -85,6 +93,27 @@ func (s *settings) GetToken() string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.Token
+}
+func (s *settings) GetCertFile() string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.CertFilePath
+}
+func (s *settings) GetCertKey() string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.CertKeyPath
+}
+
+func (s *settings) GetUsername() string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.Username
+}
+func (s *settings) GetPassword() string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.Password
 }
 
 func (s *settings) GetFilePath() string {

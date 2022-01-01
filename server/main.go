@@ -152,7 +152,7 @@ func sendReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI) {
 		select {
 		case <-ticker.C:
 			newRandom := r3.Intn(10)
-			if newRandom > 5 && time.Now().Local().Hour() <= 23 && time.Now().Local().Hour() >= 9{
+			if newRandom > 5 && time.Now().Local().Hour() <= 23 && time.Now().Local().Hour() >= 9 {
 				chatList := chats.GetInstance()
 				log.Info("random decided to update ", newRandom)
 				log.Info(chatList)
@@ -165,7 +165,7 @@ func sendReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI) {
 					}
 				}
 
-			}else{
+			} else {
 				log.Info("Random decided not to update right now")
 			}
 		}

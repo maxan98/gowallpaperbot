@@ -1,3 +1,6 @@
+# Don't forget to export following env variables:
+# X_WPPR_USERNAME
+# X_WPPR_PASSWORD
 token: "xxx"
 fileDir: "/tmp/wpprfiles/"
 allowedIDs:

@@ -3,6 +3,7 @@ package share
 import (
 	"bytes"
 	clients2 "client/clients"
+	"client/settings"
 	"client/wallpaper"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -19,7 +20,20 @@ func getWallpaper(w http.ResponseWriter, r *http.Request) {
 	if len(splitted) != 0 {
 		clients.AppendClient(splitted[0])
 	}
-
+	u, p, ok := r.BasicAuth()
+	if !ok {
+		log.Info("Error parsing basic auth")
+		w.WriteHeader(401)
+		return
+	}
+	set := settings.GetInstance()
+	setu := set.GetUsername()
+	setp := set.GetPassword()
+	if u != setu || p != setp {
+		log.Info("Bad auth..")
+		w.WriteHeader(401)
+		return
+	}
 	buffer := new(bytes.Buffer)
 	img := wallpaper.GetPicture()
 	data, _, err := img.GetPicture()
@@ -43,6 +57,7 @@ func getWallpaper(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleRequests() {
+	set := settings.GetInstance()
 	http.HandleFunc("/", getWallpaper)
-	log.Fatal(http.ListenAndServe(":10000", nil))
+	log.Fatal(http.ListenAndServeTLS(":10000", set.GetFilePath(), set.CertKeyPath, nil))
 }
