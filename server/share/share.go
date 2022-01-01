@@ -59,5 +59,5 @@ func getWallpaper(w http.ResponseWriter, r *http.Request) {
 func HandleRequests() {
 	set := settings.GetInstance()
 	http.HandleFunc("/", getWallpaper)
-	log.Fatal(http.ListenAndServeTLS(":10000", set.GetFilePath(), set.CertKeyPath, nil))
+	log.Fatal(http.ListenAndServeTLS(":10000", set.GetCertFile(), set.GetCertKey(), nil))
 }
