@@ -204,7 +204,10 @@ func main() {
 	u.Timeout = 60
 
 	updates := bot.GetUpdatesChan(u)
-
+	err = os.MkdirAll(set.GetSettings().GetFilePath(), 0775)
+	if err != nil {
+		log.Panic("Failed to create file structure")
+	}
 	go share.HandleRequests()
 	tick := time.NewTicker(213 * time.Minute)
 	go sendReminder(tick, bot)
