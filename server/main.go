@@ -12,7 +12,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/golang/freetype/truetype"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/image/colornames"
 	"golang.org/x/image/font/gofont/goregular"
 	"image"
 	"image/jpeg"
@@ -44,7 +43,7 @@ func ApplyLabel(img image.Image, text string) image.Image {
 	return i
 }
 
-func downloadFile(filepath string, url string, res chan bool, text string) {
+func downloadFile(filepath string, url string, res chan int, text string) {
 	set := settings.GetInstance()
 	// Create the file
 	err := os.MkdirAll(set.GetSettings().GetFilePath(), 0775)
@@ -54,7 +53,7 @@ func downloadFile(filepath string, url string, res chan bool, text string) {
 	log.Info("saving to", set.GetSettings().GetFilePath(), filepath)
 	out, err := os.Create(set.GetSettings().GetFilePath() + filepath)
 	if err != nil {
-		res <- false
+		res <- 0
 		return
 	}
 	defer out.Close()
@@ -62,14 +61,14 @@ func downloadFile(filepath string, url string, res chan bool, text string) {
 	// Get the data
 	resp, err := http.Get(url)
 	if err != nil {
-		res <- false
+		res <- 0
 		return
 	}
 	defer resp.Body.Close()
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		res <- false
+		res <- 0
 		return
 	}
 	if text != "" {
@@ -86,19 +85,22 @@ func downloadFile(filepath string, url string, res chan bool, text string) {
 		}
 		err = jpeg.Encode(out, imgLabeled, &opt)
 		if err != nil {
-			res <- false
+			res <- 0
+			return
+		}else {
+			res <- 2
 			return
 		}
 	} else {
 		// Writer the body to file
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
-			res <- false
+			res <- 0
 			return
 		}
 	}
 
-	res <- true
+	res <- 1
 
 }
 func cleanupFiles() {
@@ -139,7 +141,7 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 		}
 		ext := filepath.Ext(directURL)
 		if len(directURL) != 0 {
-			reschan := make(chan bool)
+			reschan := make(chan int)
 			go downloadFile(file.FileID+ext, directURL, reschan, update.Message.Text)
 
 			select {
@@ -147,8 +149,14 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Error: Context Deadline Exceeded")
 				break
 			case res := <-reschan:
-				if res == true {
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP")
+				if res == 1 || res == 2 {
+					if res == 1{
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP")
+					}
+					if res == 2{
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP. I have also noticed" +
+							" that you wanted to insert some text into the wallpaper - will be done :) ")
+					}
 					img := wallpaper.GetPicture()
 					err = img.SetPicture(settings.GetSettings().GetFilePath() + file.FileID + ext)
 					if err != nil {
