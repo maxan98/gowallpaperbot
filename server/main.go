@@ -142,7 +142,7 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 		ext := filepath.Ext(directURL)
 		if len(directURL) != 0 {
 			reschan := make(chan int)
-			go downloadFile(file.FileID+ext, directURL, reschan, update.Message.Text)
+			go downloadFile(file.FileID+ext, directURL, reschan, update.Message.Caption)
 
 			select {
 			case <-ctx.Done():
