@@ -8,8 +8,14 @@ import (
 	"client/wallpaper"
 	"context"
 	"fmt"
+	"github.com/fogleman/gg"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/golang/freetype/truetype"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/image/colornames"
+	"golang.org/x/image/font/gofont/goregular"
+	"image"
+	"image/jpeg"
 	"io"
 	"math/rand"
 	"net/http"
@@ -18,7 +24,27 @@ import (
 	"time"
 )
 
-func downloadFile(filepath string, url string, res chan bool) {
+func ApplyLabel(img image.Image, text string) image.Image {
+	dc := gg.NewContextForImage(img)
+	font, _ := truetype.Parse(goregular.TTF)
+	ff := truetype.NewFace(font, &truetype.Options{Size: 124})
+	dc.SetFontFace(ff)
+	words := dc.WordWrap(text, 3000.)
+	y := 300.
+	dc.SetRGBA255(87, 166, 198, 35)
+
+	dc.DrawRoundedRectangle(130., 150., 3000., float64(len(words)*150.)+50, 50)
+	dc.Fill()
+	for _, i := range words {
+		dc.SetRGBA255(31, 74, 911, 205)
+		dc.DrawStringAnchored(i, 150., y, 0., 0.)
+		y += 150
+	}
+	i := dc.Image()
+	return i
+}
+
+func downloadFile(filepath string, url string, res chan bool, text string) {
 	set := settings.GetInstance()
 	// Create the file
 	err := os.MkdirAll(set.GetSettings().GetFilePath(), 0775)
@@ -46,12 +72,30 @@ func downloadFile(filepath string, url string, res chan bool) {
 		res <- false
 		return
 	}
+	if text != "" {
+		img, _, err := image.Decode(resp.Body)
+		if err != nil {
+			log.Info("Unable to apply the label")
 
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		res <- false
-		return
+		} else {
+
+		}
+		imgLabeled := ApplyLabel(img, text)
+		opt := jpeg.Options{
+			Quality: 90,
+		}
+		err = jpeg.Encode(out, imgLabeled, &opt)
+		if err != nil {
+			res <- false
+			return
+		}
+	} else {
+		// Writer the body to file
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			res <- false
+			return
+		}
 	}
 
 	res <- true
@@ -96,39 +140,36 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 		ext := filepath.Ext(directURL)
 		if len(directURL) != 0 {
 			reschan := make(chan bool)
-			go downloadFile(file.FileID+ext, directURL, reschan)
-			for {
-				select {
-				case <-ctx.Done():
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Error: Context Deadline Exceeded")
-					break
-				case res := <-reschan:
-					if res == true {
-						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP")
-						img := wallpaper.GetPicture()
-						err = img.SetPicture(settings.GetSettings().GetFilePath() + file.FileID + ext)
-						if err != nil {
-							msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unexpected error when saving image"+err.Error())
-						}
+			go downloadFile(file.FileID+ext, directURL, reschan, update.Message.Text)
 
-						cl := clients.GetInstance()
-						cleanupFiles()
-						for _, i := range cl.GetClients() {
-							log.Info("Trying to ping the clients callback URL at ", i)
-							cburl := fmt.Sprintf("http://%s:10001", i)
-							_, err := http.Get(cburl)
-							if err != nil {
-								log.Info(err)
-							}
-						}
-
-						break
-					} else {
-						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unexpected error")
-						break
-					}
-				}
+			select {
+			case <-ctx.Done():
+				msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Error: Context Deadline Exceeded")
 				break
+			case res := <-reschan:
+				if res == true {
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP")
+					img := wallpaper.GetPicture()
+					err = img.SetPicture(settings.GetSettings().GetFilePath() + file.FileID + ext)
+					if err != nil {
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unexpected error when saving image"+err.Error())
+					}
+
+					cl := clients.GetInstance()
+					cleanupFiles()
+					for _, i := range cl.GetClients() {
+						log.Info("Trying to ping the clients callback URL at ", i)
+						cburl := fmt.Sprintf("http://%s:10001", i)
+						_, err := http.Get(cburl)
+						if err != nil {
+							log.Info(err)
+						}
+					}
+					break
+				} else {
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unexpected error")
+					break
+				}
 			}
 
 		}
@@ -218,8 +259,8 @@ func main() {
 					chatList := chats.GetInstance()
 					chatList.AppendClient(update.Message.Chat.ID)
 
-					ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-					defer cancel()
+					ctx, _ := context.WithTimeout(context.Background(), 25*time.Second)
+
 					go processRequest(update, ctx, bot)
 				}
 			}
