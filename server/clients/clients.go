@@ -5,6 +5,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -18,7 +20,9 @@ var DB *gorm.DB
 func Init() {
 	log.Info("DB init and migration started (clients)")
 	var err error
-	DB, err = gorm.Open(sqlite.Open("clients.db"), &gorm.Config{Logger: gorm_logrus.New()})
+	hd,_ := os.UserHomeDir()
+	dbpath := filepath.Join(hd,".wppr","clients.db")
+	DB, err = gorm.Open(sqlite.Open(dbpath), &gorm.Config{Logger: gorm_logrus.New()})
 	if err != nil {
 		panic("failed to connect database")
 	}

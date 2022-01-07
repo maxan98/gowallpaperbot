@@ -264,6 +264,11 @@ func main() {
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
+	hd,_ := os.UserHomeDir()
+	err = os.MkdirAll(filepath.Join(hd,".wppr"), 0775)
+	if err != nil {
+		log.Panic("Failed to create file structure")
+	}
 	go share.HandleRequests()
 	tick := time.NewTicker(213 * time.Minute)
 	emerChan := make(chan bool)
