@@ -1,33 +1,39 @@
 package clients
 
-import "sync"
+import (
+	log "github.com/sirupsen/logrus"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"time"
+)
 
-type clients struct {
-	ips  []string
-	lock sync.Mutex
+type Client struct {
+	IP       string
+	LastSeen time.Time
 }
 
-var instance *clients
-var once sync.Once
+var DB *gorm.DB
 
-func GetInstance() *clients {
-	once.Do(func() {
-		instance = new(clients)
-	})
-	return instance
-}
-func (s *clients) GetClients() []string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return s.ips
-}
-func (s *clients) AppendClient(ip string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for _, i := range s.ips {
-		if i == ip {
-			return
-		}
+func Init() {
+	log.Info("DB init and migration started (clients)")
+	var err error
+	DB, err = gorm.Open(sqlite.Open("clients.db"), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
 	}
-	s.ips = append(s.ips, ip)
+
+	// Миграция схем
+	DB.AutoMigrate(&Client{})
+
+}
+func UpdateLastSeen(ip string) {
+	var client Client
+	DB.Where("ip = ?", ip).First(&client)
+	client.LastSeen = time.Now()
+	DB.Save(&client)
+}
+func GetAllClients() []Client {
+	var clients []Client
+	DB.Find(&clients)
+	return clients
 }

@@ -2,24 +2,29 @@ package share
 
 import (
 	"bytes"
-	clients2 "client/clients"
-	"client/settings"
-	"client/wallpaper"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+
 	"image/jpeg"
 	"net/http"
+	clients "server/clients"
+	"server/settings"
+
+	"server/wallpaper"
 	"strconv"
 	"strings"
 )
 
 func getWallpaper(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.RemoteAddr)
-	clients := clients2.GetInstance()
+
 	splitted := strings.Split(r.RemoteAddr, ":")
 	if len(splitted) != 0 {
-		clients.AppendClient(splitted[0])
+		clients.DB.FirstOrCreate(&clients.Client{}, clients.Client{
+			IP: splitted[0],
+		})
 	}
+	clients.UpdateLastSeen(splitted[0])
 	u, p, ok := r.BasicAuth()
 	if !ok {
 		log.Info("Error parsing basic auth")

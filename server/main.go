@@ -1,11 +1,6 @@
 package main
 
 import (
-	"client/chats"
-	clients "client/clients"
-	"client/settings"
-	"client/share"
-	"client/wallpaper"
 	"context"
 	"fmt"
 	"github.com/fogleman/gg"
@@ -13,6 +8,12 @@ import (
 	"github.com/golang/freetype/truetype"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/image/font/gofont/goregular"
+	clients "server/clients"
+	"server/settings"
+	"server/share"
+	"server/users"
+	"server/wallpaper"
+
 	"image"
 	"image/jpeg"
 	"io"
@@ -87,7 +88,7 @@ func downloadFile(filepath string, url string, res chan int, text string) {
 		if err != nil {
 			res <- 0
 			return
-		}else {
+		} else {
 			res <- 2
 			return
 		}
@@ -125,6 +126,7 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 	var msg tgbotapi.MessageConfig
 	settings := settings.GetInstance()
 	log.Infof("[%s] %s", update.Message.From.UserName, update.Message.Text)
+	users.UpdateLastSeen(update.Message.From.ID)
 	if update.Message.Photo != nil || update.Message.Document != nil {
 		var file *tgbotapi.File
 		if len(update.Message.Photo) != 0 {
@@ -150,11 +152,11 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 				break
 			case res := <-reschan:
 				if res == 1 || res == 2 {
-					if res == 1{
+					if res == 1 {
 						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP")
 					}
-					if res == 2{
-						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP. I have also noticed" +
+					if res == 2 {
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Cool! Thanks for making my day better. I will update the wallpaper ASAP. I have also noticed"+
 							" that you wanted to insert some text into the wallpaper - will be done :) ")
 					}
 					img := wallpaper.GetPicture()
@@ -163,11 +165,11 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unexpected error when saving image"+err.Error())
 					}
 
-					cl := clients.GetInstance()
+					cl := clients.GetAllClients()
 					cleanupFiles()
-					for _, i := range cl.GetClients() {
-						log.Info("Trying to ping the clients callback URL at ", i)
-						cburl := fmt.Sprintf("http://%s:10001", i)
+					for _, i := range cl {
+						log.Info("Trying to ping the clients callback URL at ", i.IP)
+						cburl := fmt.Sprintf("http://%s:10001", i.IP)
 						_, err := http.Get(cburl)
 						if err != nil {
 							log.Info(err)
@@ -192,27 +194,31 @@ func processRequest(update tgbotapi.Update, ctx context.Context, bot *tgbotapi.B
 		log.Info("error in sending response")
 	}
 }
-
-func sendReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI) {
+func sendUpdateMessage(userList []users.User, bot *tgbotapi.BotAPI) {
+	for _, i := range userList {
+		msg := tgbotapi.NewMessage(i.ChatID, "Hey! It is been a while since you last updated the wallpaper. Please find some time to do so :)")
+		_, err := bot.Send(msg)
+		if err != nil {
+			log.Info("error in sending response")
+		}
+	}
+}
+func runReminder(ticker *time.Ticker, bot *tgbotapi.BotAPI, emergencyChan chan bool) {
 	log.Info("Starting reminder goroutine")
 	s3 := rand.NewSource(time.Now().UnixNano())
 	r3 := rand.New(s3)
 	for {
 		select {
+		case <-emergencyChan:
+			userList := users.GetUniqueChats()
+			log.Info("Force Random update ")
+			sendUpdateMessage(userList, bot)
 		case <-ticker.C:
 			newRandom := r3.Intn(10)
 			if newRandom > 5 && time.Now().Local().Hour() <= 23 && time.Now().Local().Hour() >= 9 {
-				chatList := chats.GetInstance()
-				log.Info("random decided to update ", newRandom)
-				log.Info(chatList)
-				ch := chatList.GetClients()
-				for _, i := range ch {
-					msg := tgbotapi.NewMessage(i, "Hey! It is been a while since you last updated the wallpaper. Please find some time to do so :)")
-					_, err := bot.Send(msg)
-					if err != nil {
-						log.Info("error in sending response")
-					}
-				}
+				userList := users.GetUniqueChats()
+				log.Info("Random decided to update ", newRandom)
+				sendUpdateMessage(userList, bot)
 
 			} else {
 				log.Info("Random decided not to update right now")
@@ -245,7 +251,8 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	clients.Init()
+	users.Init()
 	bot.Debug = true
 	log.Infof("Authorized on account %s", bot.Self.UserName)
 	tgbotapi.SetLogger(log.StandardLogger())
@@ -259,17 +266,25 @@ func main() {
 	}
 	go share.HandleRequests()
 	tick := time.NewTicker(213 * time.Minute)
-	go sendReminder(tick, bot)
+	emerChan := make(chan bool)
+	go runReminder(tick, bot, emerChan)
 	for update := range updates {
 		if update.Message != nil { // If we got a message
 			for _, i := range set.AllowedIDs {
 				if update.Message.From.ID == i {
-					chatList := chats.GetInstance()
-					chatList.AppendClient(update.Message.Chat.ID)
+					users.DB.FirstOrCreate(&users.User{}, users.User{
+						ChatID:   update.Message.Chat.ID,
+						UserName: update.Message.From.UserName,
+						UserID:   update.Message.From.ID,
+					})
+					if update.Message.Text == "PleaseUpdate" {
+						emerChan <- true
+					} else {
+						ctx, _ := context.WithTimeout(context.Background(), 25*time.Second)
 
-					ctx, _ := context.WithTimeout(context.Background(), 25*time.Second)
+						go processRequest(update, ctx, bot)
+					}
 
-					go processRequest(update, ctx, bot)
 				}
 			}
 		}
