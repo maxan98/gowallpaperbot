@@ -24,11 +24,11 @@ func Init() {
 	dbpath := filepath.Join(hd, ".wppr", "clients.db")
 	_, errc := os.Create(dbpath)
 	if errc != nil {
-		panic("failed to create database")
+		log.Fatal("failed to create database")
 	}
 	DB, err = gorm.Open(sqlite.Open(dbpath), &gorm.Config{Logger: gorm_logrus.New()})
 	if err != nil {
-		panic("failed to connect database")
+		log.Fatal("failed to connect database")
 	}
 
 	// Миграция схем

@@ -264,10 +264,13 @@ func main() {
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
-	hd, _ := os.UserHomeDir()
+	hd, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal("unable to get user's home dir")
+	}
 	err = os.MkdirAll(filepath.Join(hd, ".wppr"), 0775)
 	if err != nil {
-		log.Panic("Failed to create file structure")
+		log.Fatal("Failed to create file structure")
 	}
 	go share.HandleRequests()
 	tick := time.NewTicker(213 * time.Minute)
