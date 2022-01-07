@@ -11,6 +11,7 @@ import (
 )
 
 type Client struct {
+	gorm.Model
 	IP       string
 	LastSeen time.Time
 }
