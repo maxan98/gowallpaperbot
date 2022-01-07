@@ -20,8 +20,12 @@ var DB *gorm.DB
 func Init() {
 	log.Info("DB init and migration started (clients)")
 	var err error
-	hd,_ := os.UserHomeDir()
-	dbpath := filepath.Join(hd,".wppr","clients.db")
+	hd, _ := os.UserHomeDir()
+	dbpath := filepath.Join(hd, ".wppr", "clients.db")
+	_, errc := os.Create(dbpath)
+	if errc != nil {
+		panic("failed to create database")
+	}
 	DB, err = gorm.Open(sqlite.Open(dbpath), &gorm.Config{Logger: gorm_logrus.New()})
 	if err != nil {
 		panic("failed to connect database")

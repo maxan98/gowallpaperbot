@@ -264,8 +264,8 @@ func main() {
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
-	hd,_ := os.UserHomeDir()
-	err = os.MkdirAll(filepath.Join(hd,".wppr"), 0775)
+	hd, _ := os.UserHomeDir()
+	err = os.MkdirAll(filepath.Join(hd, ".wppr"), 0775)
 	if err != nil {
 		log.Panic("Failed to create file structure")
 	}
