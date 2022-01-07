@@ -251,8 +251,7 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-	clients.Init()
-	users.Init()
+
 	bot.Debug = true
 	log.Infof("Authorized on account %s", bot.Self.UserName)
 	tgbotapi.SetLogger(log.StandardLogger())
@@ -272,6 +271,8 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to create file structure")
 	}
+	clients.Init()
+	users.Init()
 	go share.HandleRequests()
 	tick := time.NewTicker(213 * time.Minute)
 	emerChan := make(chan bool)
