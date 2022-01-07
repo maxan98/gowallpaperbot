@@ -45,7 +45,7 @@ func UpdateLastSeen(id int64) {
 }
 func GetUniqueChats() []User {
 	var users []User
-	DB.Distinct("chatid").Find(&users)
+	DB.Distinct("chat_id").Find(&users)
 	return users
 
 }
