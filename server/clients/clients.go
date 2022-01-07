@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"github.com/onrik/gorm-logrus"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -17,7 +18,7 @@ var DB *gorm.DB
 func Init() {
 	log.Info("DB init and migration started (clients)")
 	var err error
-	DB, err = gorm.Open(sqlite.Open("clients.db"), &gorm.Config{})
+	DB, err = gorm.Open(sqlite.Open("clients.db"), &gorm.Config{Logger: gorm_logrus.New()})
 	if err != nil {
 		panic("failed to connect database")
 	}
